@@ -1,0 +1,17 @@
+# --- Phase 1: Dataset generation ---
+openai>=1.40.0
+pydantic>=2.7.0
+python-dotenv>=1.0.1
+
+# --- Phase 2: QLoRA fine-tuning (Colab/Kaggle) ---
+unsloth
+trl
+transformers
+accelerate
+bitsandbytes
+peft
+torch
+
+# --- Phase 3: Production inference + validation ---
+langchain>=0.2.0
+langchain-community
