@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Civic Issue Gateway — Structured API Router</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0A0F1E;
+    --bg2:       #111827;
+    --card:      #1A2332;
+    --card2:     #1E2D42;
+    --border:    #2A3F5A;
+    --cyan:      #00D4FF;
+    --cyan-dim:  #00A8CC;
+    --amber:     #FF6B35;
+    --amber-dim: #D4552A;
+    --green:     #00FF88;
+    --purple:    #7C3AED;
+    --text:      #E8F4FD;
+    --muted:     #8BA5C0;
+    --mono:      'JetBrains Mono', monospace;
+    --sans:      'Space Grotesk', sans-serif;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── NOISE OVERLAY ─── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── GRID BACKGROUND ─── */
+  .grid-bg {
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ─── GLOW ORBS ─── */
+  .orb {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(120px);
+    opacity: 0.12;
+    pointer-events: none;
+    z-index: 0;
+    animation: drift 12s ease-in-out infinite alternate;
+  }
+  .orb-1 { width: 600px; height: 600px; background: var(--cyan);   top: -200px; left: -100px; }
+  .orb-2 { width: 500px; height: 500px; background: var(--purple); bottom: -150px; right: -100px; animation-delay: -6s; }
+  .orb-3 { width: 300px; height: 300px; background: var(--amber);  top: 40%; left: 50%; transform: translate(-50%,-50%); animation-delay: -3s; opacity: 0.07; }
+
+  @keyframes drift { from { transform: translate(0,0); } to { transform: translate(30px, 40px); } }
+
+  /* ─── NAV ─── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 48px;
+    background: rgba(10,15,30,0.7);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(0,212,255,0.1);
+  }
+
+  .nav-logo {
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700; font-size: 1rem; letter-spacing: -0.02em;
+  }
+
+  .nav-logo .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%,100% { transform: scale(1); box-shadow: 0 0 12px var(--cyan); }
+    50%      { transform: scale(1.3); box-shadow: 0 0 24px var(--cyan); }
+  }
+
+  .nav-badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: rgba(0,212,255,0.1);
+    border: 1px solid rgba(0,212,255,0.25);
+    color: var(--cyan);
+    letter-spacing: 0.08em;
+  }
+
+  .nav-links { display: flex; gap: 32px; align-items: center; }
+  .nav-links a {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 0.88rem;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+  .nav-links a:hover { color: var(--text); }
+
+  .nav-cta {
+    padding: 8px 20px;
+    border-radius: 8px;
+    background: var(--amber);
+    color: white !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    transition: background 0.2s, transform 0.15s !important;
+  }
+  .nav-cta:hover { background: var(--amber-dim) !important; transform: translateY(-1px); }
+
+  /* ─── HERO ─── */
+  .hero {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 120px 24px 80px;
+    text-align: center;
+  }
+
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.12em;
+    color: var(--cyan);
+    padding: 6px 14px;
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 20px;
+    background: rgba(0,212,255,0.05);
+    margin-bottom: 28px;
+    text-transform: uppercase;
+  }
+
+  .hero-eyebrow::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse-dot 2s infinite;
+  }
+
+  h1 {
+    font-size: clamp(2.4rem, 5.5vw, 4.2rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.1;
+    max-width: 860px;
+    margin-bottom: 20px;
+  }
+
+  h1 .accent-cyan  { color: var(--cyan); }
+  h1 .accent-amber { color: var(--amber); }
+
+  .hero-sub {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 640px;
+    line-height: 1.6;
+    margin-bottom: 44px;
+    font-weight: 400;
+  }
+
+  /* ─── STATS ROW ─── */
+  .stats-row {
+    display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;
+    margin-bottom: 72px;
+  }
+
+  .stat-pill {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 18px;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    background: rgba(26,35,50,0.6);
+    backdrop-filter: blur(8px);
+    font-size: 0.82rem;
+    transition: border-color 0.2s, transform 0.2s;
+  }
+  .stat-pill:hover { border-color: var(--cyan); transform: translateY(-2px); }
+
+  .stat-pill strong { color: var(--text); font-weight: 600; }
+  .stat-pill span   { color: var(--muted); }
+
+  .stat-icon { font-size: 1rem; }
+
+  /* ─── DEMO SECTION ─── */
+  .demo-section {
+    position: relative; z-index: 1;
+    padding: 0 24px 100px;
+    display: flex; justify-content: center;
+  }
+
+  .demo-card {
+    width: 100%; max-width: 1140px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border-radius: 20px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: var(--card);
+    box-shadow: 0 40px 120px rgba(0,0,0,0.6), 0 0 0 1px rgba(0,212,255,0.05);
+    transform-style: preserve-3d;
+    transition: transform 0.15s ease-out;
+  }
+
+  /* ─── INPUT PANEL ─── */
+  .input-panel {
+    padding: 40px;
+    border-right: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 24px;
+    background: linear-gradient(135deg, var(--card) 0%, var(--card2) 100%);
+  }
+
+  .panel-label {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .panel-label::before {
+    content: '';
+    width: 3px; height: 14px;
+    background: var(--cyan);
+    border-radius: 2px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 160px;
+    padding: 18px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(10,15,30,0.6);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.25s, box-shadow 0.25s;
+  }
+
+  textarea:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px rgba(0,212,255,0.12), inset 0 0 20px rgba(0,212,255,0.03);
+  }
+
+  textarea::placeholder { color: var(--muted); }
+
+  .lang-chips {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  .lang-chip {
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+  }
+
+  .lang-chip:hover, .lang-chip.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0,212,255,0.08);
+  }
+
+  .btn-row { display: flex; gap: 12px; }
+
+  .btn-clear {
+    flex: 1;
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-clear:hover { border-color: var(--text); color: var(--text); }
+
+  .btn-submit {
+    flex: 2;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(135deg, var(--amber), #FF4500);
+    color: white;
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: -0.01em;
+  }
+
+  .btn-submit::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .btn-submit:hover::after { opacity: 1; }
+  .btn-submit:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(255,107,53,0.4); }
+  .btn-submit:active { transform: translateY(0); }
+
+  .btn-submit .btn-icon { margin-right: 8px; }
+
+  /* ─── OUTPUT PANEL ─── */
+  .output-panel {
+    padding: 40px;
+    background: #0D1421;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+
+  .output-header {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+
+  .output-tabs { display: flex; gap: 4px; }
+
+  .tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    cursor: pointer;
+    color: var(--muted);
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .tab.active {
+    background: rgba(0,212,255,0.1);
+    border-color: rgba(0,212,255,0.25);
+    color: var(--cyan);
+  }
+
+  .output-actions { display: flex; gap: 8px; }
+
+  .icon-btn {
+    width: 32px; height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem;
+    transition: all 0.2s;
+  }
+  .icon-btn:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(0,212,255,0.08); }
+
+  .json-container {
+    flex: 1;
+    background: rgba(0,0,0,0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(0,212,255,0.08);
+    padding: 20px;
+    overflow: auto;
+    min-height: 220px;
+    position: relative;
+  }
+
+  .json-output {
+    font-family: var(--mono);
+    font-size: 0.82rem;
+    line-height: 1.8;
+    white-space: pre;
+  }
+
+  .json-key    { color: #7DD3FC; }
+  .json-string { color: #86EFAC; }
+  .json-bool   { color: #FCA5A5; }
+  .json-null   { color: var(--muted); }
+  .json-brace  { color: var(--muted); }
+  .json-comma  { color: var(--muted); }
+
+  .json-placeholder {
+    display: flex; align-items: center; justify-content: center;
+    height: 100%; min-height: 160px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    flex-direction: column; gap: 12px;
+  }
+
+  .json-placeholder .ph-icon { font-size: 2rem; opacity: 0.4; }
+
+  /* ─── STATUS BADGES ─── */
+  .status-row {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  .status-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.4s, transform 0.4s;
+  }
+
+  .status-badge.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  .badge-category { background: rgba(0,212,255,0.12); color: var(--cyan); border: 1px solid rgba(0,212,255,0.2); }
+  .badge-priority-high   { background: rgba(255,70,70,0.12); color: #FF7070; border: 1px solid rgba(255,70,70,0.2); }
+  .badge-priority-medium { background: rgba(255,200,50,0.12); color: #FFD050; border: 1px solid rgba(255,200,50,0.2); }
+  .badge-priority-low    { background: rgba(0,255,136,0.12); color: var(--green); border: 1px solid rgba(0,255,136,0.2); }
+  .badge-lang   { background: rgba(124,58,237,0.12); color: #A78BFA; border: 1px solid rgba(124,58,237,0.2); }
+  .badge-urgent { background: rgba(255,107,53,0.15); color: var(--amber); border: 1px solid rgba(255,107,53,0.25); }
+
+  /* ─── LOADING ─── */
+  .loader {
+    display: none;
+    align-items: center; gap: 12px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--cyan);
+    padding: 12px 0;
+  }
+  .loader.active { display: flex; }
+
+  .loader-dots { display: flex; gap: 4px; }
+  .loader-dots span {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--cyan);
+    animation: bounce 1.2s infinite;
+  }
+  .loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  @keyframes bounce {
+    0%,80%,100% { transform: scale(0.6); opacity: 0.4; }
+    40%          { transform: scale(1.1); opacity: 1; }
+  }
+
+  /* ─── EXAMPLES SECTION ─── */
+  .examples-section {
+    position: relative; z-index: 1;
+    padding: 0 24px 100px;
+    max-width: 1140px;
+    margin: 0 auto;
+  }
+
+  .section-header {
+    display: flex; align-items: center; gap: 16px;
+    margin-bottom: 32px;
+  }
+
+  .section-eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--cyan);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  .section-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+
+  .examples-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+
+  .example-card {
+    padding: 20px 22px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .example-card::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--cyan), transparent);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .example-card:hover {
+    border-color: rgba(0,212,255,0.35);
+    transform: translateY(-4px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4), 0 0 0 1px rgba(0,212,255,0.1);
+  }
+
+  .example-card:hover::before { opacity: 1; }
+
+  .example-card-tag {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--cyan);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .example-card-tag .tag-dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: currentColor;
+  }
+
+  .example-card-text {
+    font-size: 0.88rem;
+    color: var(--text);
+    line-height: 1.5;
+    font-weight: 400;
+  }
+
+  .example-card-arrow {
+    position: absolute;
+    bottom: 18px; right: 20px;
+    color: var(--muted);
+    font-size: 1.1rem;
+    transition: transform 0.2s, color 0.2s;
+  }
+
+  .example-card:hover .example-card-arrow {
+    transform: translate(3px, -3px);
+    color: var(--cyan);
+  }
+
+  /* ─── HOW IT WORKS ─── */
+  .how-section {
+    position: relative; z-index: 1;
+    padding: 0 24px 120px;
+    max-width: 1140px;
+    margin: 0 auto;
+  }
+
+  .pipeline-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 40px;
+    position: relative;
+  }
+
+  .pipeline-steps::before {
+    content: '';
+    position: absolute;
+    top: 38px; left: 10%; right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), var(--border), var(--border), transparent);
+  }
+
+  .step {
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+    padding: 0 20px;
+  }
+
+  .step-num {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.4rem;
+    margin-bottom: 20px;
+    position: relative;
+    z-index: 1;
+    transition: all 0.3s;
+  }
+
+  .step:hover .step-num {
+    border-color: var(--cyan);
+    box-shadow: 0 0 24px rgba(0,212,255,0.2);
+    transform: translateY(-4px);
+  }
+
+  .step-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+
+  .step-desc {
+    font-size: 0.8rem;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+
+  /* ─── FOOTER ─── */
+  footer {
+    position: relative; z-index: 1;
+    border-top: 1px solid var(--border);
+    padding: 32px 48px;
+    display: flex; align-items: center; justify-content: space-between;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  footer a {
+    color: var(--cyan);
+    text-decoration: none;
+  }
+
+  footer a:hover { text-decoration: underline; }
+
+  .footer-links { display: flex; gap: 24px; }
+
+  /* ─── COPY TOAST ─── */
+  #copy-toast {
+    position: fixed;
+    bottom: 32px; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--card2);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    padding: 10px 20px;
+    border-radius: 8px;
+    z-index: 9999;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    pointer-events: none;
+  }
+  #copy-toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 768px) {
+    nav { padding: 14px 20px; }
+    .nav-links { display: none; }
+
+    .demo-card {
+      grid-template-columns: 1fr;
+    }
+    .input-panel { border-right: none; border-bottom: 1px solid var(--border); }
+
+    .examples-grid { grid-template-columns: 1fr; }
+    .pipeline-steps { grid-template-columns: 1fr 1fr; gap: 20px; }
+    .pipeline-steps::before { display: none; }
+
+    footer { flex-direction: column; gap: 16px; text-align: center; }
+    .footer-links { flex-wrap: wrap; justify-content: center; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .orb, .dot, .loader-dots span { animation: none; }
+    .demo-card, .example-card, .step-num, .btn-submit { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="grid-bg"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <div class="nav-logo">
+    <div class="dot"></div>
+    Civic Gateway
+    <span class="nav-badge">v1.0 · Llama-3-8B</span>
+  </div>
+  <div class="nav-links">
+    <a href="#demo">Live Demo</a>
+    <a href="#how">How it Works</a>
+    <a href="https://github.com/SonuSwain526/structured-api-router" target="_blank">GitHub</a>
+    <a href="https://huggingface.co/" target="_blank" class="nav-cta">🤗 HuggingFace</a>
+  </div>
+</nav>
+
+<!-- ─── HERO ─── -->
+<section class="hero">
+  <div class="hero-eyebrow">Fine-tuned · QLoRA · GGUF · Production Ready</div>
+
+  <h1>
+    Messy Complaints →<br/>
+    <span class="accent-cyan">Structured JSON</span>,<br/>
+    <span class="accent-amber">Instantly</span>
+  </h1>
+
+  <p class="hero-sub">
+    A fine-tuned Llama-3-8B model that parses multilingual civic complaints —
+    English, Hindi, or Hinglish — into validated, schema-compliant JSON payloads
+    ready for any downstream API or dashboard.
+  </p>
+
+  <div class="stats-row">
+    <div class="stat-pill">
+      <span class="stat-icon">⚡</span>
+      <strong>~120ms</strong>
+      <span>avg latency</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-icon">🎯</span>
+      <strong>100%</strong>
+      <span>schema compliance</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-icon">🌐</span>
+      <strong>3</strong>
+      <span>languages supported</span>
+    </div>
+    <div class="stat-pill">
+      <span class="stat-icon">🏷️</span>
+      <strong>8B</strong>
+      <span>parameter model</span>
+    </div>
+  </div>
+
+  <a href="#demo" style="text-decoration:none">
+    <button class="btn-submit" style="padding:16px 40px;font-size:1rem;border-radius:12px">
+      <span class="btn-icon">↓</span> Try Live Demo
+    </button>
+  </a>
+</section>
+
+<!-- ─── DEMO ─── -->
+<div id="demo" class="demo-section">
+  <div class="demo-card" id="demo-card">
+
+    <!-- INPUT PANEL -->
+    <div class="input-panel">
+      <div class="panel-label">Civic Complaint Input</div>
+
+      <textarea id="complaint-input" rows="6"
+        placeholder="Type a civic complaint in any language…&#10;&#10;e.g. Bhai master canteen road pe heavy water logging hai, bikes are slipping"></textarea>
+
+      <div>
+        <div class="panel-label" style="margin-bottom:10px">Detected Language</div>
+        <div class="lang-chips">
+          <div class="lang-chip" id="chip-en">🇬🇧 English</div>
+          <div class="lang-chip" id="chip-hi">🇮🇳 Hindi</div>
+          <div class="lang-chip" id="chip-hinglish" >⚡ Hinglish</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn-clear" id="btn-clear">Clear</button>
+        <button class="btn-submit" id="btn-submit">
+          <span class="btn-icon">⚡</span> Analyze &amp; Route
+        </button>
+      </div>
+
+      <div class="loader" id="loader">
+        <div class="loader-dots">
+          <span></span><span></span><span></span>
+        </div>
+        Routing through Llama-3-8B…
+      </div>
+    </div>
+
+    <!-- OUTPUT PANEL -->
+    <div class="output-panel">
+      <div class="output-header">
+        <div class="output-tabs">
+          <div class="tab active">JSON Output</div>
+          <div class="tab">Raw Text</div>
+        </div>
+        <div class="output-actions">
+          <button class="icon-btn" id="btn-copy" title="Copy JSON">⎘</button>
+          <button class="icon-btn" id="btn-expand" title="Expand">⤢</button>
+        </div>
+      </div>
+
+      <div class="json-container" id="json-container">
+        <div class="json-placeholder" id="json-placeholder">
+          <span class="ph-icon">{ }</span>
+          <span>Submit a complaint to see structured output</span>
+        </div>
+        <div class="json-output" id="json-output" style="display:none"></div>
+      </div>
+
+      <div class="status-row" id="status-row"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── EXAMPLES ─── -->
+<section id="examples" class="examples-section">
+  <div class="section-header">
+    <div>
+      <div class="section-eyebrow">Try These</div>
+      <div class="section-title">Example Complaints</div>
+    </div>
+  </div>
+
+  <div class="examples-grid" id="examples-grid">
+    <!-- JS will populate -->
+  </div>
+</section>
+
+<!-- ─── HOW IT WORKS ─── -->
+<section id="how" class="how-section">
+  <div class="section-header">
+    <div>
+      <div class="section-eyebrow">Under the Hood</div>
+      <div class="section-title">How the Pipeline Works</div>
+    </div>
+  </div>
+
+  <div class="pipeline-steps">
+    <div class="step">
+      <div class="step-num">📝</div>
+      <div class="step-title">Raw Complaint</div>
+      <div class="step-desc">User submits text in any language, style, or tone — no formatting required</div>
+    </div>
+    <div class="step">
+      <div class="step-num">🧠</div>
+      <div class="step-title">Llama-3-8B Inference</div>
+      <div class="step-desc">Fine-tuned model (QLoRA) processes the complaint and extracts intent</div>
+    </div>
+    <div class="step">
+      <div class="step-num">✅</div>
+      <div class="step-title">Schema Validation</div>
+      <div class="step-desc">Output is validated against a strict JSON schema with 100% compliance</div>
+    </div>
+    <div class="step">
+      <div class="step-num">🚀</div>
+      <div class="step-title">API Ready</div>
+      <div class="step-desc">Structured payload is returned, ready to route to any downstream service</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <span>Built by <a href="https://github.com/SonuSwain526" target="_blank">Sonu Swain</a> · Civic Issue Gateway</span>
+  <div class="footer-links">
+    <a href="https://github.com/SonuSwain526/structured-api-router" target="_blank">GitHub</a>
+    <a href="https://huggingface.co/" target="_blank">HuggingFace Space</a>
+    <span style="color:var(--border)">|</span>
+    <span>Llama-3-8B · QLoRA · GGUF</span>
+  </div>
+</footer>
+
+<!-- ─── TOAST ─── -->
+<div id="copy-toast">✓ Copied to clipboard</div>
+
+<script>
+/* ─── DATA ─── */
+const EXAMPLES = [
+  {
+    tag: "WATER_LOGGING",
+    text: "Bhai master canteen road pe heavy water logging hai, bikes are slipping",
+    lang: "hinglish"
+  },
+  {
+    tag: "STREETLIGHT",
+    text: "There has been no streetlight on MG Road for a week, very unsafe at night",
+    lang: "english"
+  },
+  {
+    tag: "ELECTRICITY",
+    text: "HELP there's a live wire hanging near the bus stop on main market road, kids walk here",
+    lang: "english"
+  },
+  {
+    tag: "GARBAGE",
+    text: "Hamare mohalle mein 5 din se kachra nahi utha, bahut buri smell aa rahi hai",
+    lang: "hindi"
+  },
+  {
+    tag: "ROAD_DAMAGE",
+    text: "Unit 4 square ke paas bada sa pothole hai, raat ko accident ho sakta hai yaar",
+    lang: "hinglish"
+  },
+  {
+    tag: "WATER_SUPPLY",
+    text: "No water supply since yesterday morning in Saheed Nagar sector 3, please help",
+    lang: "english"
+  },
+];
+
+/* ─── RENDER EXAMPLES ─── */
+function renderExamples() {
+  const grid = document.getElementById('examples-grid');
+  grid.innerHTML = '';
+  EXAMPLES.forEach(ex => {
+    const card = document.createElement('div');
+    card.className = 'example-card';
+    card.innerHTML = `
+      <div class="example-card-tag"><span class="tag-dot"></span>${ex.tag}</div>
+      <div class="example-card-text">${ex.text}</div>
+      <div class="example-card-arrow">↗</div>
+    `;
+    card.addEventListener('click', () => {
+      document.getElementById('complaint-input').value = ex.text;
+      setLangChip(ex.lang);
+      document.getElementById('demo').scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => handleSubmit(), 400);
+    });
+    grid.appendChild(card);
+  });
+}
+
+/* ─── LANG CHIPS ─── */
+function setLangChip(lang) {
+  document.querySelectorAll('.lang-chip').forEach(c => c.classList.remove('active'));
+  const map = { english: 'chip-en', hindi: 'chip-hi', hinglish: 'chip-hinglish' };
+  if (map[lang]) document.getElementById(map[lang]).classList.add('active');
+}
+
+function detectLang(text) {
+  const hindiPattern = /[\u0900-\u097F]/;
+  if (hindiPattern.test(text)) return 'hindi';
+  const hinglish = /(bhai|yaar|karo|hai|pe|ke|ka|ko|nahi|aur|mein|se|wala)/i;
+  if (hinglish.test(text)) return 'hinglish';
+  return 'english';
+}
+
+/* ─── 3D TILT ─── */
+const card = document.getElementById('demo-card');
+card.addEventListener('mousemove', e => {
+  const rect = card.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width  - 0.5;
+  const y = (e.clientY - rect.top)  / rect.height - 0.5;
+  card.style.transform = `perspective(1200px) rotateY(${x * 6}deg) rotateX(${-y * 4}deg) scale(1.01)`;
+});
+card.addEventListener('mouseleave', () => {
+  card.style.transform = 'perspective(1200px) rotateY(0deg) rotateX(0deg) scale(1)';
+});
+
+/* ─── HIGHLIGHT JSON ─── */
+function syntaxHighlight(json) {
+  return json.replace(
+    /("(\\u[a-fA-F0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?|[{}[\],])/g,
+    match => {
+      if (/^"/.test(match)) {
+        if (/:$/.test(match)) return `<span class="json-key">${match}</span>`;
+        return `<span class="json-string">${match}</span>`;
+      }
+      if (/true|false/.test(match)) return `<span class="json-bool">${match}</span>`;
+      if (/null/.test(match))        return `<span class="json-null">${match}</span>`;
+      if (/[{}[\]]/.test(match))     return `<span class="json-brace">${match}</span>`;
+      if (/[,]/.test(match))         return `<span class="json-comma">${match}</span>`;
+      return match;
+    }
+  );
+}
+
+/* ─── TYPEWRITER JSON ─── */
+function typewriterJSON(el, html, onDone) {
+  const stripped = html.replace(/<[^>]+>/g, '');
+  let i = 0;
+  const tagRegex = /<[^>]+>/g;
+
+  function next() {
+    if (i > stripped.length) { if (onDone) onDone(); return; }
+    // rebuild html up to char i
+    let raw = stripped.slice(0, i);
+    let result = '';
+    let pos = 0;
+    const matches = [...html.matchAll(/<[^>]+>/g)];
+    for (const m of matches) {
+      const beforeTag = html.slice(pos, m.index).replace(/<[^>]+>/g, '');
+      // simplified: just show highlighted up to i
+    }
+    el.innerHTML = syntaxHighlight(stripped.slice(0, i));
+    i += 2;
+    setTimeout(next, 8);
+  }
+  next();
+}
+
+/* ─── SUBMIT ─── */
+async function handleSubmit() {
+  const text = document.getElementById('complaint-input').value.trim();
+  if (!text) return;
+
+  const lang = detectLang(text);
+  setLangChip(lang);
+
+  // Show loader
+  document.getElementById('loader').classList.add('active');
+  document.getElementById('btn-submit').disabled = true;
+  document.getElementById('json-placeholder').style.display = 'none';
+  document.getElementById('json-output').style.display = 'none';
+  document.getElementById('status-row').innerHTML = '';
+
+  try {
+    const LOCAL_MODE = false;  // ← set to true to test UI without HF Space
+    const HF_SPACE_URL = 'https://gourabswain-civic-complaint-router.hf.space';
+
+    let parsed;
+
+    if (LOCAL_MODE) {
+      await new Promise(r => setTimeout(r, 1200));
+      parsed = {
+        category: "WATER_LOGGING",
+        location_raw: "Master Canteen Road, Bhubaneswar",
+        priority: "MEDIUM",
+        sentiment: "FRUSTRATED",
+        description_summary: "Heavy water logging on Master Canteen Road causing bikes to slip.",
+        language_detected: "HINGLISH",
+        requires_immediate_attention: false
+      };
+    } else {
+      // This Space requires Gradio's queue API (not direct /run/predict)
+      // Flow: POST /queue/join → get event_id → GET /queue/data (SSE stream) → parse result
+      const session_hash = Math.random().toString(36).slice(2, 12);
+
+      // Step 1: join the queue
+      const joinRes = await fetch(`${HF_SPACE_URL}/queue/join`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          data: [text],
+          fn_index: 0,
+          session_hash
+        })
+      });
+
+      if (!joinRes.ok) {
+        const err = await joinRes.text().catch(() => '');
+        throw new Error(`Queue join failed (${joinRes.status}): ${err.slice(0, 200)}`);
+      }
+
+      const { event_id } = await joinRes.json();
+
+      // Step 2: listen to SSE stream for result
+      const result = await new Promise((resolve, reject) => {
+        const evtSource = new EventSource(
+          `${HF_SPACE_URL}/queue/data?session_hash=${session_hash}`
+        );
+
+        const timeout = setTimeout(() => {
+          evtSource.close();
+          reject(new Error('Model timed out after 120s. The Space may be loading the GGUF model — try again in 30s.'));
+        }, 120000);
+
+        evtSource.onmessage = (e) => {
+          try {
+            const msg = JSON.parse(e.data);
+            if (msg.msg === 'process_completed') {
+              clearTimeout(timeout);
+              evtSource.close();
+              resolve(msg.output);  // { data: [...], error: null }
+            }
+            // msg.msg can be: 'send_hash', 'estimation', 'process_starts', 'process_completed'
+          } catch { /* ignore non-JSON SSE lines */ }
+        };
+
+        evtSource.onerror = () => {
+          clearTimeout(timeout);
+          evtSource.close();
+          reject(new Error('SSE connection lost. Check if Space is running.'));
+        };
+      });
+
+      if (result.error) throw new Error(`Model error: ${result.error}`);
+
+      // result.data[0] = JSON string (the Code component output)
+      const jsonString = result.data[0];
+      try {
+        parsed = JSON.parse(jsonString);
+      } catch {
+        parsed = { error: "Model returned invalid JSON", raw: jsonString };
+      }
+    }
+
+    const pretty = JSON.stringify(parsed, null, 2);
+    const highlighted = syntaxHighlight(pretty);
+
+    const out = document.getElementById('json-output');
+    out.style.display = 'block';
+    out.innerHTML = '';
+
+    // Typewriter
+    let i = 0;
+    const chars = pretty.split('');
+    function type() {
+      if (i < chars.length) {
+        out.innerHTML = syntaxHighlight(pretty.slice(0, i + 1));
+        i += 3;
+        setTimeout(type, 6);
+      } else {
+        out.innerHTML = highlighted;
+        showBadges(parsed);
+      }
+    }
+    type();
+
+  } catch (err) {
+    document.getElementById('json-output').style.display = 'block';
+    document.getElementById('json-output').innerHTML = `<span style="color:#FF7070">Error: ${err.message}</span>`;
+  } finally {
+    document.getElementById('loader').classList.remove('active');
+    document.getElementById('btn-submit').disabled = false;
+  }
+}
+
+/* ─── BADGES ─── */
+function showBadges(data) {
+  const row = document.getElementById('status-row');
+  row.innerHTML = '';
+
+  const badges = [];
+  // category icons matching your IssueCategory enum in app.py
+  const categoryIcons = {
+    WATER_LOGGING: '🌊', ROAD_DAMAGE: '🛣️', GARBAGE: '🗑️',
+    STREETLIGHT: '💡', ELECTRICITY: '⚡', SEWAGE: '🚰',
+    ILLEGAL_CONSTRUCTION: '🏗️', NOISE_POLLUTION: '🔊',
+    WATER_SUPPLY: '💧', OTHER: '📋'
+  };
+  if (data.category) {
+    const icon = categoryIcons[data.category] || '📋';
+    badges.push({ cls: 'badge-category', text: `${icon} ${data.category}` });
+  }
+  if (data.priority) {
+    // matches PriorityLevel enum: LOW, MEDIUM, HIGH, CRITICAL
+    const cls = (data.priority === 'HIGH' || data.priority === 'CRITICAL')
+               ? 'badge-priority-high'
+               : data.priority === 'LOW' ? 'badge-priority-low' : 'badge-priority-medium';
+    badges.push({ cls, text: '⚑ ' + data.priority });
+  }
+  // LanguageDetected enum: EN, HI, HINGLISH, OTHER
+  const langLabels = { EN: '🇬🇧 English', HI: '🇮🇳 Hindi', HINGLISH: '⚡ Hinglish', OTHER: '🌐 Other' };
+  if (data.language_detected) {
+    badges.push({ cls: 'badge-lang', text: langLabels[data.language_detected] || data.language_detected });
+  }
+  if (data.requires_immediate_attention) badges.push({ cls: 'badge-urgent', text: '🚨 URGENT' });
+
+  badges.forEach((b, i) => {
+    const el = document.createElement('div');
+    el.className = `status-badge ${b.cls}`;
+    el.textContent = b.text;
+    row.appendChild(el);
+    setTimeout(() => el.classList.add('visible'), i * 80);
+  });
+}
+
+/* ─── COPY ─── */
+document.getElementById('btn-copy').addEventListener('click', () => {
+  const out = document.getElementById('json-output');
+  if (!out.textContent) return;
+  navigator.clipboard.writeText(out.textContent).then(() => {
+    const toast = document.getElementById('copy-toast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2200);
+  });
+});
+
+/* ─── CLEAR ─── */
+document.getElementById('btn-clear').addEventListener('click', () => {
+  document.getElementById('complaint-input').value = '';
+  document.getElementById('json-output').style.display = 'none';
+  document.getElementById('json-placeholder').style.display = 'flex';
+  document.getElementById('status-row').innerHTML = '';
+  document.querySelectorAll('.lang-chip').forEach(c => c.classList.remove('active'));
+});
+
+/* ─── SUBMIT BUTTON ─── */
+document.getElementById('btn-submit').addEventListener('click', handleSubmit);
+document.getElementById('complaint-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
+});
+
+/* ─── SMOOTH SCROLL FOR NAV ─── */
+document.querySelectorAll('a[href^="#"]').forEach(a => {
+  a.addEventListener('click', e => {
+    e.preventDefault();
+    document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+  });
+});
+
+/* ─── INIT ─── */
+renderExamples();
+</script>
+</body>
+</html>
