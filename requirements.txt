@@ -15,3 +15,6 @@ torch
 # --- Phase 3: Production inference + validation ---
 langchain>=0.2.0
 langchain-community
+
+llama-cpp-python
+llama-cpp-python
